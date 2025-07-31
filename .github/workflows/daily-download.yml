@@ -57,17 +57,22 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
       run: |
+        # First, pull the latest changes to ensure we're up to date
+        git pull origin main
+        
+        # Add the downloaded files
         git add downloads/
+        
+        # Check if there are any changes to commit
         if git diff --staged --quiet; then
           echo "No new files to commit"
         else
-          # Fetch latest changes
-          git fetch origin main
-          
           # Commit our changes
           git commit -m "Add CSE trade summary data - $(date '+%Y-%m-%d %H:%M:%S UTC')"
           
-          # Rebase on top of latest changes and push
+          # Pull again with rebase in case there were new changes during our process
           git pull --rebase origin main
+          
+          # Push the changes
           git push origin main
         fi
