@@ -16,6 +16,7 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
@@ -23,30 +24,43 @@ share/python-wheels/
 MANIFEST
 
 # Virtual Environment
-.env
-.venv
-env/
 venv/
+.venv/
+env/
 ENV/
 env.bak/
 venv.bak/
 
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Logs
+# Selenium
 *.log
+geckodriver.log
+chromedriver.log
 
-# Chrome driver
-chromedriver*
+# Temporary files
+*.tmp
+*.temp
 
-# Keep downloads directory but ignore its contents
-downloads/*
-!downloads/.gitkeep
+# Test files
+test_*.py
+setup.py
+setup.bat
+
+# Keep downloaded CSV files in downloads directory
+!downloads/
+!downloads/*.csv

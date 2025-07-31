@@ -1,17 +1,28 @@
-# CSE Trade Data Automation
+# CSE Trade Summary Automation
 
-This project automatically downloads trade summary data from the Colombo Stock Exchange (CSE) website and stores it with timestamped filenames.
+This project automatically downloads the daily trade summary from the Colombo Stock Exchange (CSE) website and commits it to the repository.
 
 ## Features
 
-- **Automated Download**: Downloads CSV files from CSE trade summary page
-- **Smart Naming**: Renames files using the timestamp from the webpage
-- **Daily Automation**: GitHub Actions workflow runs daily at 4:00 PM Sri Lankan time
-- **All Data**: Automatically selects "All" option to download complete dataset
+- **Automated Download**: Downloads CSV data from CSE trade summary page
+- **Smart Naming**: Files are named with the timestamp from the page (e.g., `cse_trade_summary_2025-07-31_14-47-42.csv`)
+- **Daily Scheduling**: Runs automatically every day at 4:00 PM Sri Lankan Time
+- **Git Integration**: Automatically commits and pushes downloaded files
+- **Headless Operation**: Runs without UI for GitHub Actions compatibility
 
-## Setup
+## How it works
 
-### Local Development
+1. **Navigate** to the CSE trade summary page
+2. **Select "All"** from the records dropdown to get complete data
+3. **Wait** for the table to load all records
+4. **Extract** the timestamp from the page header
+5. **Download** the CSV file
+6. **Rename** the file with the extracted timestamp
+7. **Commit and push** to the git repository
+
+## Setup Instructions
+
+### Local Setup
 
 1. **Clone the repository**
    ```bash
@@ -19,74 +30,100 @@ This project automatically downloads trade summary data from the Colombo Stock E
    cd cse-automate
    ```
 
-2. **Install dependencies**
+2. **Install Python dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Run manually**
+3. **Run manually (optional)**
    ```bash
-   python cse_downloader.py
+   python cse_automation.py
    ```
 
 ### GitHub Actions Setup
 
-The project includes a GitHub Actions workflow that:
-- Runs daily at 4:00 PM Sri Lankan Time (10:30 AM UTC)
-- Downloads the latest trade data
-- Commits and pushes the files to the repository
+The automation is configured to run automatically via GitHub Actions:
 
-No additional setup is required - the workflow will run automatically once you push this code to GitHub.
+- **Schedule**: Every day at 4:00 PM Sri Lankan Time (10:30 AM UTC)
+- **Manual Trigger**: Can be triggered manually from the Actions tab
 
-## How it Works
+#### Prerequisites
 
-1. **Navigate to CSE Website**: Opens the trade summary page
-2. **Change Display Settings**: Changes dropdown from "25" to "All" items
-3. **Extract Timestamp**: Gets the current timestamp from the page
-4. **Download CSV**: Clicks the download button and saves CSV file
-5. **Rename File**: Renames the downloaded file with the extracted timestamp
-6. **Store Data**: Saves file in the `downloads/` directory
+1. **Enable GitHub Actions** in your repository settings
+2. **Ensure repository permissions** allow Actions to write to the repository
+3. **Push this code** to your GitHub repository
+
+The workflow will automatically:
+- Set up Python environment
+- Install Chrome browser
+- Install dependencies
+- Run the automation script
+- Commit and push any new files
 
 ## File Structure
 
 ```
+.
 ├── .github/
 │   └── workflows/
-│       └── download-cse-data.yml  # GitHub Actions workflow
-├── downloads/                      # Downloaded CSV files (auto-created)
-├── cse_downloader.py              # Main automation script
-├── requirements.txt               # Python dependencies
-└── README.md                      # This file
+│       └── daily-download.yml    # GitHub Actions workflow
+├── downloads/                    # Directory for downloaded files
+├── cse_automation.py            # Main automation script
+├── requirements.txt             # Python dependencies
+└── README.md                   # This file
 ```
 
-## Downloaded File Format
+## Downloaded Files
 
-Files are saved with the format: `CSE_Trade_Summary_{timestamp}.csv`
+Files are saved with the following naming convention:
+```
+cse_trade_summary_YYYY-MM-DD_HH-MM-SS.csv
+```
 
-Example: `CSE_Trade_Summary_Jul_31__2025__2_47_42_PM.csv`
-
-## Manual Trigger
-
-You can manually trigger the GitHub Actions workflow:
-1. Go to the "Actions" tab in your GitHub repository
-2. Select "CSE Trade Data Download"
-3. Click "Run workflow"
-
-## Requirements
-
-- Python 3.11+
-- Chrome browser (for Selenium)
-- Internet connection
-- GitHub repository (for automated runs)
+Example: `cse_trade_summary_2025-07-31_14-47-42.csv`
 
 ## Troubleshooting
 
-If the script fails:
-1. Check if the CSE website structure has changed
-2. Verify Chrome browser is installed
-3. Check internet connectivity
-4. Review the GitHub Actions logs for detailed error messages
+### Common Issues
 
-## Contributing
+1. **Chrome Driver Issues**: The script uses `webdriver-manager` to automatically download and manage Chrome drivers
+2. **Download Timeouts**: Increase the timeout in `wait_for_download()` if downloads are slow
+3. **Git Push Failures**: Ensure the repository has proper permissions for GitHub Actions
 
-Feel free to submit issues or pull requests to improve the automation.
+### Manual Testing
+
+To test the automation locally:
+
+```bash
+python cse_automation.py
+```
+
+Check the `downloads/` directory for the downloaded file.
+
+## Configuration
+
+### Changing the Schedule
+
+To modify the daily run time, edit the cron expression in `.github/workflows/daily-download.yml`:
+
+```yaml
+schedule:
+  - cron: '30 10 * * *'  # Current: 4:00 PM LKT (10:30 AM UTC)
+```
+
+Use [crontab.guru](https://crontab.guru/) to generate different schedules.
+
+### Download Directory
+
+By default, files are downloaded to the `downloads/` directory. To change this, modify the `download_dir` variable in `cse_automation.py`.
+
+## Dependencies
+
+- **selenium**: Web automation
+- **webdriver-manager**: Automatic Chrome driver management
+- **requests**: HTTP requests (if needed)
+- **python-dateutil**: Date parsing utilities
+
+## License
+
+This project is for educational and personal use. Please respect the CSE website's terms of service and rate limits.
