@@ -32,15 +32,17 @@ class CSEDownloader:
         
         chrome_options.add_experimental_option("prefs", prefs)
         
-        # Add headless mode for GitHub Actions
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
+        # Add headless mode only for GitHub Actions
+        if os.environ.get('GITHUB_ACTIONS') or os.environ.get('CI'):
+            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--disable-extensions")
+            chrome_options.add_argument("--disable-plugins")
+            chrome_options.add_argument("--disable-images")
+            
         chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument("--disable-extensions")
-        chrome_options.add_argument("--disable-plugins")
-        chrome_options.add_argument("--disable-images")
         
         # Setup driver with explicit environment handling
         print(f"GITHUB_ACTIONS environment: {os.environ.get('GITHUB_ACTIONS', 'Not set')}")
@@ -72,14 +74,29 @@ class CSEDownloader:
             try:
                 # Try WebDriver Manager for local development
                 from webdriver_manager.chrome import ChromeDriverManager
-                service = Service(ChromeDriverManager().install())
+                
+                # For newer Chrome versions, try different approaches
+                try:
+                    print("Trying to get ChromeDriver...")
+                    service = Service(ChromeDriverManager().install())
+                except Exception as wdm_error:
+                    print(f"WebDriver Manager failed: {wdm_error}")
+                    print("Trying with specific Chrome version compatibility...")
+                    # Try with specific driver version that works with newer Chrome
+                    service = Service(ChromeDriverManager(version="129.0.6668.89").install())
+                    
                 self.driver = webdriver.Chrome(service=service, options=chrome_options)
                 print("✅ ChromeDriver initialized with WebDriver Manager")
-            except ImportError:
+            except Exception as local_error:
+                print(f"Local WebDriver setup failed: {local_error}")
                 # Fallback to system ChromeDriver
-                service = Service()
-                self.driver = webdriver.Chrome(service=service, options=chrome_options)
-                print("✅ ChromeDriver initialized with system driver")
+                try:
+                    service = Service()
+                    self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                    print("✅ ChromeDriver initialized with system driver")
+                except Exception as system_error:
+                    print(f"❌ All ChromeDriver methods failed: {system_error}")
+                    raise
         
     def get_timestamp_from_page(self):
         """Extract timestamp from the updated-time span element"""
