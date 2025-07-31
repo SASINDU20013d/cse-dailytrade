@@ -2,13 +2,13 @@ import time
 import os
 import re
 from datetime import datetime
+import requests
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support.select import Select
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.chrome.options import Options
 
 class CSEDownloader:
     def __init__(self, download_path="downloads"):
@@ -17,52 +17,49 @@ class CSEDownloader:
         self.setup_driver()
     
     def setup_driver(self):
-        """Setup Chrome driver with download preferences."""
+        """Sets up the Selenium WebDriver using proven GitHub Actions approach"""
         # Create download directory if it doesn't exist
         os.makedirs(self.download_path, exist_ok=True)
         
-        chrome_options = ChromeOptions()
+        options = Options()
         
-        # Chrome preferences for downloads
+        # Check if running in CI or local environment
+        is_ci = os.environ.get('GITHUB_ACTIONS') or os.environ.get('CI')
+        
+        if is_ci:
+            # Essential headless options for GitHub Actions (from your working example)
+            print("Setting up Chrome for CI environment...")
+            options.add_argument("--headless")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--window-size=1920,1080")
+            options.add_argument("--disable-extensions")
+            options.add_argument("--proxy-server='direct://'")
+            options.add_argument("--proxy-bypass-list=*")
+        else:
+            # For local testing, minimal options
+            print("Setting up Chrome for local environment...")
+            options.add_argument("--window-size=1920,1080")
+            options.add_argument("--disable-web-security")
+            options.add_argument("--disable-features=VizDisplayCompositor")
+        
+        # Add download preferences
         prefs = {
             "download.default_directory": self.download_path,
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
             "safebrowsing.enabled": True
         }
-        
-        chrome_options.add_experimental_option("prefs", prefs)
-        chrome_options.add_argument("--window-size=1920,1080")
-        
-        is_ci = os.environ.get('GITHUB_ACTIONS') or os.environ.get('CI')
-        
-        # Configure options for CI environment
-        if is_ci:
-            print("Running in CI environment - adding headless mode")
-            chrome_options.add_argument("--headless")
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--disable-gpu")
-            # Explicitly set binary location for Chrome in GitHub Actions
-            chrome_options.binary_location = "/opt/google/chrome/chrome"
-        else:
-            print("Running in local environment")
+        options.add_experimental_option("prefs", prefs)
         
         try:
-            # Selenium Manager (part of Selenium 4.6+) will automatically find the driver.
-            # This works for both local and CI environments.
-            print("Setting up Chrome with Selenium Manager...")
-            service = ChromeService()
-            self.driver = webdriver.Chrome(service=service, options=chrome_options)
-            print("✅ Chrome initialized successfully with Selenium Manager")
-
+            print("Setting up WebDriver...")
+            self.driver = webdriver.Chrome(options=options)
+            print("✅ Chrome initialized successfully")
+            
         except Exception as e:
-            print(f"❌ Error setting up ChromeDriver: {e}")
-            if is_ci:
-                print("GITHUB_ACTIONS environment: true")
-                import shutil
-                chromedriver_path = shutil.which('chromedriver')
-                print(f"Final ChromeDriver check:\n{chromedriver_path}")
+            print(f"❌ Error setting up Chrome: {e}")
             raise
     
     def wait_for_download(self, expected_filename_pattern=None, timeout=30):
@@ -104,9 +101,10 @@ class CSEDownloader:
             print(f"🔗 Navigating to: {url}")
             
             self.driver.get(url)
+            print("Page navigation complete.")
             
             # Wait for page to load
-            wait = WebDriverWait(self.driver, 20)
+            wait = WebDriverWait(self.driver, 30)
             
             # Wait for the Market dropdown to be present
             print("⏳ Waiting for Market dropdown...")
@@ -173,8 +171,13 @@ class CSEDownloader:
                 # Store files before download
                 files_before = set(os.listdir(self.download_path)) if os.path.exists(self.download_path) else set()
                 
-                # Click the button
-                self.driver.execute_script("arguments[0].click();", csv_button)
+                # Try clicking the button
+                try:
+                    # First try regular click
+                    csv_button.click()
+                except:
+                    # If regular click fails, try JavaScript click
+                    self.driver.execute_script("arguments[0].click();", csv_button)
                 
                 # Wait for download
                 downloaded_file = self.wait_for_download(expected_filename_pattern=r'.*\.csv$')
@@ -192,10 +195,12 @@ class CSEDownloader:
                         
                         # Verify file size
                         file_size = os.path.getsize(new_path)
-                        print(f"📊 File size: {file_size} bytes")
+                        print(f"📊 File size: {file_size:,} bytes")
                         
                         if file_size > 0:
-                            print("✅ Download completed successfully!")
+                            print("-" * 50)
+                            print(f"✅ SUCCESS: Downloaded file: {new_path}")
+                            print("-" * 50)
                             return new_path
                         else:
                             print("❌ Downloaded file is empty")
@@ -210,19 +215,34 @@ class CSEDownloader:
                     return None
             else:
                 print("❌ Could not find Export CSV button")
+                # Save page source for debugging
+                try:
+                    with open(os.path.join(self.download_path, 'debug_page.html'), 'w', encoding='utf-8') as f:
+                        f.write(self.driver.page_source)
+                    print("💾 Page source saved for debugging")
+                except:
+                    pass
                 return None
                 
         except Exception as e:
             print(f"❌ Error during download: {e}")
+            # Save page source for debugging
+            try:
+                with open(os.path.join(self.download_path, 'debug_page.html'), 'w', encoding='utf-8') as f:
+                    f.write(self.driver.page_source)
+                print("💾 Page source saved for debugging")
+            except:
+                pass
             return None
     
     def close(self):
         """Close the browser driver"""
         if self.driver:
+            print("Closing WebDriver.")
             self.driver.quit()
-            print("🔒 Browser closed")
 
 def main():
+    """Main function to run the script."""
     downloader = None
     try:
         print("🚀 Starting CSE Trade Summary Downloader...")
