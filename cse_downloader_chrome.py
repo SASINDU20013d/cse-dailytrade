@@ -8,7 +8,6 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support.select import Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options as ChromeOptions
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service as ChromeService
 
 class CSEDownloader:
@@ -18,7 +17,7 @@ class CSEDownloader:
         self.setup_driver()
     
     def setup_driver(self):
-        """Setup Chrome driver with download preferences using webdriver-manager"""
+        """Setup Chrome driver with download preferences."""
         # Create download directory if it doesn't exist
         os.makedirs(self.download_path, exist_ok=True)
         
@@ -35,51 +34,42 @@ class CSEDownloader:
         chrome_options.add_experimental_option("prefs", prefs)
         chrome_options.add_argument("--window-size=1920,1080")
         
-        # Check if we're in CI environment
-        if os.environ.get('GITHUB_ACTIONS') or os.environ.get('CI'):
+        is_ci = os.environ.get('GITHUB_ACTIONS') or os.environ.get('CI')
+        
+        # Configure options for CI environment
+        if is_ci:
             print("Running in CI environment - adding headless mode")
             chrome_options.add_argument("--headless")
             chrome_options.add_argument("--no-sandbox")
             chrome_options.add_argument("--disable-dev-shm-usage")
             chrome_options.add_argument("--disable-gpu")
+            # Explicitly set binary location for Chrome in GitHub Actions
+            chrome_options.binary_location = "/opt/google/chrome/chrome"
         else:
             print("Running in local environment")
         
         try:
-            # Use webdriver-manager to automatically handle ChromeDriver
-            print("Setting up Chrome with webdriver-manager...")
-            
-            # In CI environment, try to use system ChromeDriver first
-            if os.environ.get('GITHUB_ACTIONS') or os.environ.get('CI'):
-                import shutil
-                chromedriver_path = shutil.which('chromedriver')
-                if chromedriver_path:
-                    print(f"✅ Using system ChromeDriver in CI: {chromedriver_path}")
-                    service = ChromeService(chromedriver_path)
-                    self.driver = webdriver.Chrome(service=service, options=chrome_options)
-                    print("✅ Chrome initialized successfully with system ChromeDriver")
-                    return
-            
-            # For local development or if system ChromeDriver not found
-            try:
+            if is_ci:
+                print("Setting up Chrome with system ChromeDriver for CI...")
+                # Selenium Manager (part of Selenium 4.6+) will automatically find the driver in the PATH
+                service = ChromeService()
+                self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                print("✅ Chrome initialized successfully in CI")
+            else:
+                # For local development, use webdriver-manager
+                print("Setting up Chrome with webdriver-manager for local development...")
+                from webdriver_manager.chrome import ChromeDriverManager
                 service = ChromeService(ChromeDriverManager().install())
                 self.driver = webdriver.Chrome(service=service, options=chrome_options)
                 print("✅ Chrome initialized successfully with WebDriver Manager")
-            except Exception as cdm_error:
-                print(f"⚠️ ChromeDriverManager failed: {cdm_error}")
-                # Fall back to system ChromeDriver
+                
+        except Exception as e:
+            print(f"❌ Error setting up ChromeDriver: {e}")
+            if is_ci:
+                print("GITHUB_ACTIONS environment: true")
                 import shutil
                 chromedriver_path = shutil.which('chromedriver')
-                if chromedriver_path:
-                    print(f"🔄 Falling back to system ChromeDriver: {chromedriver_path}")
-                    service = ChromeService(chromedriver_path)
-                    self.driver = webdriver.Chrome(service=service, options=chrome_options)
-                    print("✅ Chrome initialized successfully with system ChromeDriver")
-                else:
-                    raise Exception("No ChromeDriver available")
-            
-        except Exception as e:
-            print(f"❌ Error setting up Chrome: {e}")
+                print(f"Final ChromeDriver check:\n{chromedriver_path}")
             raise
     
     def wait_for_download(self, expected_filename_pattern=None, timeout=30):
