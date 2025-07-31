@@ -1,0 +1,62 @@
+name: CSE Daily Report Downloader with Selenium
+
+on:
+  schedule:
+    # Run daily at 4:00 PM Sri Lankan time (10:30 AM UTC)
+    - cron: '30 10 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  download-report:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install Chrome
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
+        
+    - name: Install ChromeDriver
+      uses: browser-actions/setup-chromedriver@v1
+      with:
+        chromedriver-version: latest
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install selenium requests beautifulsoup4 webdriver-manager
+        
+    - name: Create downloads directory
+      run: mkdir -p downloads
+        
+    - name: Run CSE Downloader
+      run: python cse_downloader_chrome.py
+      
+    - name: Upload downloaded files
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: cse-daily-reports-${{ github.run_number }}
+        path: downloads/
+        retention-days: 30
+        
+    - name: List downloaded files
+      run: ls -la downloads/
+        
+    - name: Commit downloaded files
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add downloads/ || true
+        git commit -m "Add CSE daily report $(date)" || exit 0
+        git push || true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
