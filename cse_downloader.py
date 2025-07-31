@@ -50,18 +50,28 @@ class CSEDownloader:
         # Always try system ChromeDriver first in CI environments
         if os.environ.get('GITHUB_ACTIONS') or os.environ.get('CI'):
             try:
-                # Force use of system ChromeDriver - no WebDriver Manager
+                # Force use of system ChromeDriver - completely avoid WebDriver Manager
                 import shutil
-                chromedriver_path = shutil.which('chromedriver')
-                print(f"Found ChromeDriver at: {chromedriver_path}")
                 
-                if chromedriver_path and os.path.isfile(chromedriver_path):
+                # Try multiple common ChromeDriver locations
+                chromedriver_paths = [
+                    '/usr/local/bin/chromedriver',
+                    '/usr/bin/chromedriver', 
+                    shutil.which('chromedriver')
+                ]
+                
+                chromedriver_path = None
+                for path in chromedriver_paths:
+                    if path and os.path.isfile(path):
+                        chromedriver_path = path
+                        break
+                
+                if chromedriver_path:
+                    print(f"✅ Found ChromeDriver at: {chromedriver_path}")
                     service = Service(executable_path=chromedriver_path)
-                    print(f"Using ChromeDriver: {chromedriver_path}")
                 else:
-                    # Fallback to default service
+                    print("⚠️ Using default ChromeDriver service")
                     service = Service()
-                    print("Using default ChromeDriver service")
                     
                 self.driver = webdriver.Chrome(service=service, options=chrome_options)
                 print("✅ ChromeDriver initialized successfully in CI environment")

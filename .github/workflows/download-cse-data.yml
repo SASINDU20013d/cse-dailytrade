@@ -26,17 +26,39 @@ jobs:
         chrome-version: stable
         
     - name: Setup ChromeDriver
-      uses: nanasess/setup-chromedriver@v2
-      
-    - name: Clean WebDriver Manager cache
       run: |
-        echo "Cleaning WebDriver Manager cache..."
+        # Download and setup ChromeDriver manually to avoid WebDriver Manager issues
+        CHROME_VERSION=$(google-chrome --version | cut -d' ' -f3 | cut -d'.' -f1-3)
+        echo "Chrome version: $CHROME_VERSION"
+        
+        # Download compatible ChromeDriver
+        CHROMEDRIVER_VERSION="129.0.6668.89"
+        wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip"
+        unzip /tmp/chromedriver.zip -d /tmp/
+        sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/
+        sudo chmod +x /usr/local/bin/chromedriver
+        
+        # Verify installation
+        chromedriver --version
+      
+    - name: Clean WebDriver Manager cache and prevent usage
+      run: |
+        echo "Preventing WebDriver Manager usage..."
+        # Remove any existing WebDriver Manager cache
         rm -rf ~/.wdm
         rm -rf /home/runner/.wdm
         rm -rf /tmp/.wdm
         rm -rf $HOME/.wdm
-        find /home/runner -name "*chromedriver*" -type f 2>/dev/null || true
-        echo "Cache cleanup complete"
+        
+        # Remove any cached chromedriver files that might cause conflicts
+        find /home/runner -name "*chromedriver*" -type f -delete 2>/dev/null || true
+        find /tmp -name "*chromedriver*" -type f -delete 2>/dev/null || true
+        
+        # Create empty .wdm directory to prevent WebDriver Manager from working
+        mkdir -p ~/.wdm
+        chmod 000 ~/.wdm
+        
+        echo "WebDriver Manager blocked successfully"
         
     - name: Setup virtual display
       run: |
@@ -50,14 +72,24 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Verify Chrome and ChromeDriver
+    - name: Verify Chrome and ChromeDriver setup
       run: |
+        echo "=== Chrome and ChromeDriver Verification ==="
         google-chrome --version
         chromedriver --version
         which chromedriver
         ls -la $(which chromedriver)
+        echo "ChromeDriver path: $(which chromedriver)"
         echo "DISPLAY=$DISPLAY"
         echo "GITHUB_ACTIONS=$GITHUB_ACTIONS"
+        echo "CI=$CI"
+        
+        # Test ChromeDriver functionality
+        chromedriver --port=9515 --whitelisted-ips= &
+        sleep 2
+        curl -s http://localhost:9515/status || echo "ChromeDriver test failed"
+        pkill chromedriver || true
+        echo "=== Verification Complete ==="
         
     - name: Create downloads directory
       run: mkdir -p downloads
@@ -67,17 +99,24 @@ jobs:
         export DISPLAY=:99
         export GITHUB_ACTIONS=true
         export CI=true
-        # Prevent WebDriver Manager from being used
+        # Completely prevent WebDriver Manager usage
         export WDM_LOCAL=0
-        # Make sure we're using the system chromedriver
+        export WDM_LOG_LEVEL=0
+        export PATH="/usr/local/bin:$PATH"
+        
+        # Verify ChromeDriver one more time
+        echo "Final ChromeDriver check:"
         which chromedriver
         chromedriver --version
+        
+        # Run the script
         python cse_downloader.py
       env:
         DISPLAY: :99
         GITHUB_ACTIONS: true
         CI: true
         WDM_LOCAL: 0
+        WDM_LOG_LEVEL: 0
         
     - name: List downloaded files
       run: ls -la downloads/
