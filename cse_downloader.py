@@ -39,20 +39,30 @@ class CSEDownloader:
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
         
-        # Setup driver - use system ChromeDriver in GitHub Actions, WebDriver Manager locally
-        try:
-            # Try system ChromeDriver first (for GitHub Actions)
-            service = Service()  # Uses system chromedriver
+        # Setup driver - use system ChromeDriver in GitHub Actions
+        import shutil
+        
+        # Check if we're in GitHub Actions environment
+        if os.environ.get('GITHUB_ACTIONS'):
+            # Use system ChromeDriver (installed by GitHub Actions)
+            chromedriver_path = shutil.which('chromedriver')
+            if chromedriver_path:
+                print(f"Using system ChromeDriver at: {chromedriver_path}")
+                service = Service(chromedriver_path)
+            else:
+                print("ChromeDriver not found in system PATH")
+                service = Service()  # Let Selenium find it
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
-        except Exception:
-            # Fallback to WebDriver Manager (for local development)
+        else:
+            # Local development - try WebDriver Manager
             try:
                 from webdriver_manager.chrome import ChromeDriverManager
                 service = Service(ChromeDriverManager().install())
                 self.driver = webdriver.Chrome(service=service, options=chrome_options)
             except ImportError:
-                print("Please install webdriver-manager: pip install webdriver-manager")
-                raise
+                print("WebDriver Manager not available, using system ChromeDriver")
+                service = Service()
+                self.driver = webdriver.Chrome(service=service, options=chrome_options)
         
     def get_timestamp_from_page(self):
         """Extract timestamp from the updated-time span element"""
