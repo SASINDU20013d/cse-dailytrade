@@ -33,7 +33,14 @@ class CSEDownloader:
         
         chrome_options.add_experimental_option("prefs", prefs)
         
-        # Uncomment the next line if you want to run headless
+        # Add headless mode for GitHub Actions
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--window-size=1920,1080")
+        
+        # Uncomment the next line if you want to run headless locally
         # chrome_options.add_argument("--headless")
         
         # Setup driver with automatic ChromeDriver management
