@@ -1,0 +1,55 @@
+name: CSE Trade Data Download
+
+on:
+  schedule:
+    # Runs daily at 4:00 PM Sri Lankan Time (10:30 AM UTC)
+    # Sri Lanka is UTC+5:30, so 4:00 PM LKT = 10:30 AM UTC
+    - cron: '30 10 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  download-trade-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install Chrome
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Create downloads directory
+      run: mkdir -p downloads
+      
+    - name: Run CSE downloader
+      run: |
+        python cse_downloader.py
+        
+    - name: List downloaded files
+      run: ls -la downloads/
+      
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add downloads/
+        if [ -n "$(git status --porcelain)" ]; then
+          git commit -m "Auto-download CSE trade data - $(date +'%Y-%m-%d %H:%M:%S')"
+          git push
+        else
+          echo "No changes to commit"
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
