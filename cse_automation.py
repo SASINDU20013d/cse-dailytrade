@@ -246,33 +246,15 @@ class CSETradeAutomation:
         finally:
             if driver:
                 driver.quit()
-    
-    def git_commit_and_push(self, filepath):
-        """Commit and push the downloaded file to git"""
-        try:
-            print("Adding file to git...")
-            subprocess.run(["git", "add", filepath], check=True, cwd=os.getcwd())
-            
-            commit_message = f"Add CSE trade summary data - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            print(f"Committing with message: {commit_message}")
-            subprocess.run(["git", "commit", "-m", commit_message], check=True, cwd=os.getcwd())
-            
-            print("Pushing to remote repository...")
-            subprocess.run(["git", "push"], check=True, cwd=os.getcwd())
-            
-            print("Successfully committed and pushed to git!")
-            
-        except subprocess.CalledProcessError as e:
-            print(f"Git operation failed: {e}")
-            raise
 
 def main():
     """Main execution function"""
     try:
         automation = CSETradeAutomation()
         downloaded_file = automation.download_trade_summary()
-        automation.git_commit_and_push(downloaded_file)
         print("CSE Trade Summary automation completed successfully!")
+        print(f"Downloaded file: {downloaded_file}")
+        return downloaded_file
         
     except Exception as e:
         print(f"Automation failed: {e}")

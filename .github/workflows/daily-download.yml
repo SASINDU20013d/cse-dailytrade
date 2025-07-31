@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write  # Allow writing to repository content
+  actions: read    # Allow reading action metadata
 
 jobs:
   download-trade-summary:
@@ -18,7 +19,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
         fetch-depth: 0
         
     - name: Set up Python
@@ -53,11 +54,20 @@ jobs:
         ls -la downloads/ || echo "Downloads directory is empty"
         
     - name: Commit and push changes
+      env:
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
       run: |
         git add downloads/
         if git diff --staged --quiet; then
           echo "No new files to commit"
         else
+          # Fetch latest changes
+          git fetch origin main
+          
+          # Commit our changes
           git commit -m "Add CSE trade summary data - $(date '+%Y-%m-%d %H:%M:%S UTC')"
-          git push
+          
+          # Rebase on top of latest changes and push
+          git pull --rebase origin main
+          git push origin main
         fi
