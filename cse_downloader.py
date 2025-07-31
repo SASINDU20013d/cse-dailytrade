@@ -38,31 +38,48 @@ class CSEDownloader:
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--disable-plugins")
+        chrome_options.add_argument("--disable-images")
         
-        # Setup driver - use system ChromeDriver in GitHub Actions
-        import shutil
+        # Setup driver with explicit environment handling
+        print(f"GITHUB_ACTIONS environment: {os.environ.get('GITHUB_ACTIONS', 'Not set')}")
         
-        # Check if we're in GitHub Actions environment
-        if os.environ.get('GITHUB_ACTIONS'):
-            # Use system ChromeDriver (installed by GitHub Actions)
-            chromedriver_path = shutil.which('chromedriver')
-            if chromedriver_path:
-                print(f"Using system ChromeDriver at: {chromedriver_path}")
-                service = Service(chromedriver_path)
-            else:
-                print("ChromeDriver not found in system PATH")
-                service = Service()  # Let Selenium find it
-            self.driver = webdriver.Chrome(service=service, options=chrome_options)
-        else:
-            # Local development - try WebDriver Manager
+        # Always try system ChromeDriver first in CI environments
+        if os.environ.get('GITHUB_ACTIONS') or os.environ.get('CI'):
             try:
+                # Force use of system ChromeDriver - no WebDriver Manager
+                import shutil
+                chromedriver_path = shutil.which('chromedriver')
+                print(f"Found ChromeDriver at: {chromedriver_path}")
+                
+                if chromedriver_path and os.path.isfile(chromedriver_path):
+                    service = Service(executable_path=chromedriver_path)
+                    print(f"Using ChromeDriver: {chromedriver_path}")
+                else:
+                    # Fallback to default service
+                    service = Service()
+                    print("Using default ChromeDriver service")
+                    
+                self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                print("✅ ChromeDriver initialized successfully in CI environment")
+                
+            except Exception as e:
+                print(f"❌ Error setting up ChromeDriver in CI: {e}")
+                raise
+        else:
+            # Local development environment
+            try:
+                # Try WebDriver Manager for local development
                 from webdriver_manager.chrome import ChromeDriverManager
                 service = Service(ChromeDriverManager().install())
                 self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                print("✅ ChromeDriver initialized with WebDriver Manager")
             except ImportError:
-                print("WebDriver Manager not available, using system ChromeDriver")
+                # Fallback to system ChromeDriver
                 service = Service()
                 self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                print("✅ ChromeDriver initialized with system driver")
         
     def get_timestamp_from_page(self):
         """Extract timestamp from the updated-time span element"""

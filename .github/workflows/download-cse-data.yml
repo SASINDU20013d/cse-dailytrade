@@ -30,8 +30,13 @@ jobs:
       
     - name: Clean WebDriver Manager cache
       run: |
+        echo "Cleaning WebDriver Manager cache..."
         rm -rf ~/.wdm
         rm -rf /home/runner/.wdm
+        rm -rf /tmp/.wdm
+        rm -rf $HOME/.wdm
+        find /home/runner -name "*chromedriver*" -type f 2>/dev/null || true
+        echo "Cache cleanup complete"
         
     - name: Setup virtual display
       run: |
@@ -61,10 +66,18 @@ jobs:
       run: |
         export DISPLAY=:99
         export GITHUB_ACTIONS=true
+        export CI=true
+        # Prevent WebDriver Manager from being used
+        export WDM_LOCAL=0
+        # Make sure we're using the system chromedriver
+        which chromedriver
+        chromedriver --version
         python cse_downloader.py
       env:
         DISPLAY: :99
         GITHUB_ACTIONS: true
+        CI: true
+        WDM_LOCAL: 0
         
     - name: List downloaded files
       run: ls -la downloads/
