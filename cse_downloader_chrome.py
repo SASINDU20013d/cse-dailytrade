@@ -49,20 +49,13 @@ class CSEDownloader:
             print("Running in local environment")
         
         try:
-            if is_ci:
-                print("Setting up Chrome with system ChromeDriver for CI...")
-                # Selenium Manager (part of Selenium 4.6+) will automatically find the driver in the PATH
-                service = ChromeService()
-                self.driver = webdriver.Chrome(service=service, options=chrome_options)
-                print("✅ Chrome initialized successfully in CI")
-            else:
-                # For local development, use webdriver-manager
-                print("Setting up Chrome with webdriver-manager for local development...")
-                from webdriver_manager.chrome import ChromeDriverManager
-                service = ChromeService(ChromeDriverManager().install())
-                self.driver = webdriver.Chrome(service=service, options=chrome_options)
-                print("✅ Chrome initialized successfully with WebDriver Manager")
-                
+            # Selenium Manager (part of Selenium 4.6+) will automatically find the driver.
+            # This works for both local and CI environments.
+            print("Setting up Chrome with Selenium Manager...")
+            service = ChromeService()
+            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            print("✅ Chrome initialized successfully with Selenium Manager")
+
         except Exception as e:
             print(f"❌ Error setting up ChromeDriver: {e}")
             if is_ci:
