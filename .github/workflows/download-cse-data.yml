@@ -86,7 +86,16 @@ jobs:
         export DISPLAY=:99
         export GITHUB_ACTIONS=true
         export CI=true
+        export RUNNER_OS=Linux
+        export USE_FIREFOX=true
         export PATH="/usr/local/bin:$PATH"
+        
+        # Verify environment variables
+        echo "Environment check:"
+        echo "GITHUB_ACTIONS=$GITHUB_ACTIONS"
+        echo "CI=$CI"
+        echo "RUNNER_OS=$RUNNER_OS"
+        echo "USE_FIREFOX=$USE_FIREFOX"
         
         # Verify GeckoDriver one more time
         echo "Final GeckoDriver check:"
@@ -99,6 +108,8 @@ jobs:
         DISPLAY: :99
         GITHUB_ACTIONS: true
         CI: true
+        RUNNER_OS: Linux
+        USE_FIREFOX: true
         
     - name: List downloaded files
       run: ls -la downloads/

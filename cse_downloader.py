@@ -22,9 +22,23 @@ class CSEDownloader:
         # Create download directory if it doesn't exist
         os.makedirs(self.download_path, exist_ok=True)
         
-        # Check if we're in GitHub Actions environment
-        is_ci = os.environ.get('GITHUB_ACTIONS') or os.environ.get('CI')
-        print(f"Environment: {'CI/GitHub Actions' if is_ci else 'Local Development'}")
+        # Check if we're in GitHub Actions environment with detailed logging
+        github_actions = os.environ.get('GITHUB_ACTIONS')
+        ci_env = os.environ.get('CI')
+        runner_env = os.environ.get('RUNNER_OS')
+        use_firefox = os.environ.get('USE_FIREFOX')
+        
+        print(f"GITHUB_ACTIONS: {github_actions}")
+        print(f"CI: {ci_env}")
+        print(f"RUNNER_OS: {runner_env}")
+        print(f"USE_FIREFOX: {use_firefox}")
+        
+        # Force Firefox in any CI environment or when explicitly requested
+        is_ci = (github_actions == 'true' or 
+                ci_env == 'true' or 
+                runner_env is not None or 
+                use_firefox == 'true')
+        print(f"Environment: {'CI/GitHub Actions - Using Firefox' if is_ci else 'Local Development - Using Chrome'}")
         
         if is_ci:
             # Use Firefox in CI environment (more stable)
