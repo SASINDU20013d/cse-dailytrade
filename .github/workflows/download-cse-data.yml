@@ -20,26 +20,23 @@ jobs:
       with:
         python-version: '3.11'
         
-    - name: Install Chrome
-      uses: browser-actions/setup-chrome@v1
-      with:
-        chrome-version: stable
-        
-    - name: Setup ChromeDriver
+    - name: Install Firefox
       run: |
-        # Download and setup ChromeDriver manually to avoid WebDriver Manager issues
-        CHROME_VERSION=$(google-chrome --version | cut -d' ' -f3 | cut -d'.' -f1-3)
-        echo "Chrome version: $CHROME_VERSION"
+        sudo apt-get update
+        sudo apt-get install -y firefox
         
-        # Download compatible ChromeDriver
-        CHROMEDRIVER_VERSION="129.0.6668.89"
-        wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip"
-        unzip /tmp/chromedriver.zip -d /tmp/
-        sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/
-        sudo chmod +x /usr/local/bin/chromedriver
+    - name: Setup GeckoDriver (Firefox)
+      run: |
+        # Download latest GeckoDriver for Firefox
+        GECKODRIVER_VERSION="0.34.0"
+        wget -O /tmp/geckodriver.tar.gz "https://github.com/mozilla/geckodriver/releases/download/v$GECKODRIVER_VERSION/geckodriver-v$GECKODRIVER_VERSION-linux64.tar.gz"
+        tar -xzf /tmp/geckodriver.tar.gz -C /tmp/
+        sudo mv /tmp/geckodriver /usr/local/bin/
+        sudo chmod +x /usr/local/bin/geckodriver
         
         # Verify installation
-        chromedriver --version
+        geckodriver --version
+        firefox --version
       
     - name: Clean WebDriver Manager cache and prevent usage
       run: |
@@ -50,15 +47,11 @@ jobs:
         rm -rf /tmp/.wdm
         rm -rf $HOME/.wdm
         
-        # Remove any cached chromedriver files that might cause conflicts
-        find /home/runner -name "*chromedriver*" -type f -delete 2>/dev/null || true
-        find /tmp -name "*chromedriver*" -type f -delete 2>/dev/null || true
+        # Remove any cached driver files that might cause conflicts
+        find /home/runner -name "*driver*" -type f -delete 2>/dev/null || true
+        find /tmp -name "*driver*" -type f -delete 2>/dev/null || true
         
-        # Create empty .wdm directory to prevent WebDriver Manager from working
-        mkdir -p ~/.wdm
-        chmod 000 ~/.wdm
-        
-        echo "WebDriver Manager blocked successfully"
+        echo "Cache cleanup complete"
         
     - name: Setup virtual display
       run: |
@@ -72,23 +65,17 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Verify Chrome and ChromeDriver setup
+    - name: Verify Firefox and GeckoDriver setup
       run: |
-        echo "=== Chrome and ChromeDriver Verification ==="
-        google-chrome --version
-        chromedriver --version
-        which chromedriver
-        ls -la $(which chromedriver)
-        echo "ChromeDriver path: $(which chromedriver)"
+        echo "=== Firefox and GeckoDriver Verification ==="
+        firefox --version
+        geckodriver --version
+        which geckodriver
+        ls -la $(which geckodriver)
+        echo "GeckoDriver path: $(which geckodriver)"
         echo "DISPLAY=$DISPLAY"
         echo "GITHUB_ACTIONS=$GITHUB_ACTIONS"
         echo "CI=$CI"
-        
-        # Test ChromeDriver functionality
-        chromedriver --port=9515 --whitelisted-ips= &
-        sleep 2
-        curl -s http://localhost:9515/status || echo "ChromeDriver test failed"
-        pkill chromedriver || true
         echo "=== Verification Complete ==="
         
     - name: Create downloads directory
@@ -99,15 +86,12 @@ jobs:
         export DISPLAY=:99
         export GITHUB_ACTIONS=true
         export CI=true
-        # Completely prevent WebDriver Manager usage
-        export WDM_LOCAL=0
-        export WDM_LOG_LEVEL=0
         export PATH="/usr/local/bin:$PATH"
         
-        # Verify ChromeDriver one more time
-        echo "Final ChromeDriver check:"
-        which chromedriver
-        chromedriver --version
+        # Verify GeckoDriver one more time
+        echo "Final GeckoDriver check:"
+        which geckodriver
+        geckodriver --version
         
         # Run the script
         python cse_downloader.py
@@ -115,8 +99,6 @@ jobs:
         DISPLAY: :99
         GITHUB_ACTIONS: true
         CI: true
-        WDM_LOCAL: 0
-        WDM_LOG_LEVEL: 0
         
     - name: List downloaded files
       run: ls -la downloads/

@@ -6,8 +6,10 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from selenium.webdriver.firefox.service import Service as FirefoxService
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.chrome.service import Service as ChromeService
 
 class CSEDownloader:
     def __init__(self, download_path="downloads"):
@@ -16,11 +18,69 @@ class CSEDownloader:
         self.setup_driver()
     
     def setup_driver(self):
-        """Setup Chrome driver with download preferences"""
-        chrome_options = Options()
-        
+        """Setup browser driver with download preferences"""
         # Create download directory if it doesn't exist
         os.makedirs(self.download_path, exist_ok=True)
+        
+        # Check if we're in GitHub Actions environment
+        is_ci = os.environ.get('GITHUB_ACTIONS') or os.environ.get('CI')
+        print(f"Environment: {'CI/GitHub Actions' if is_ci else 'Local Development'}")
+        
+        if is_ci:
+            # Use Firefox in CI environment (more stable)
+            self.setup_firefox()
+        else:
+            # Use Chrome in local environment
+            self.setup_chrome()
+    
+    def setup_firefox(self):
+        """Setup Firefox for CI environment"""
+        firefox_options = FirefoxOptions()
+        
+        # Firefox preferences for downloads
+        firefox_options.set_preference("browser.download.folderList", 2)
+        firefox_options.set_preference("browser.download.manager.showWhenStarting", False)
+        firefox_options.set_preference("browser.download.dir", self.download_path)
+        firefox_options.set_preference("browser.helperApps.neverAsk.saveToDisk", "text/csv,application/csv")
+        
+        # Headless mode for CI
+        firefox_options.add_argument("--headless")
+        firefox_options.add_argument("--no-sandbox")
+        firefox_options.add_argument("--disable-dev-shm-usage")
+        firefox_options.add_argument("--window-size=1920,1080")
+        
+        try:
+            # Try multiple GeckoDriver locations
+            import shutil
+            geckodriver_paths = [
+                '/usr/local/bin/geckodriver',
+                '/usr/bin/geckodriver', 
+                shutil.which('geckodriver')
+            ]
+            
+            geckodriver_path = None
+            for path in geckodriver_paths:
+                if path and os.path.isfile(path):
+                    geckodriver_path = path
+                    break
+            
+            if geckodriver_path:
+                print(f"✅ Found GeckoDriver at: {geckodriver_path}")
+                service = FirefoxService(executable_path=geckodriver_path)
+            else:
+                print("⚠️ Using default GeckoDriver service")
+                service = FirefoxService()
+                
+            self.driver = webdriver.Firefox(service=service, options=firefox_options)
+            print("✅ Firefox initialized successfully in CI environment")
+            
+        except Exception as e:
+            print(f"❌ Error setting up Firefox in CI: {e}")
+            raise
+    
+    def setup_chrome(self):
+        """Setup Chrome for local environment"""
+        chrome_options = ChromeOptions()
         
         # Chrome preferences for downloads
         prefs = {
@@ -31,55 +91,9 @@ class CSEDownloader:
         }
         
         chrome_options.add_experimental_option("prefs", prefs)
-        
-        # Add headless mode only for GitHub Actions
-        if os.environ.get('GITHUB_ACTIONS') or os.environ.get('CI'):
-            chrome_options.add_argument("--headless")
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--disable-extensions")
-            chrome_options.add_argument("--disable-plugins")
-            chrome_options.add_argument("--disable-images")
-            
         chrome_options.add_argument("--window-size=1920,1080")
         
-        # Setup driver with explicit environment handling
-        print(f"GITHUB_ACTIONS environment: {os.environ.get('GITHUB_ACTIONS', 'Not set')}")
-        
-        # Always try system ChromeDriver first in CI environments
-        if os.environ.get('GITHUB_ACTIONS') or os.environ.get('CI'):
-            try:
-                # Force use of system ChromeDriver - completely avoid WebDriver Manager
-                import shutil
-                
-                # Try multiple common ChromeDriver locations
-                chromedriver_paths = [
-                    '/usr/local/bin/chromedriver',
-                    '/usr/bin/chromedriver', 
-                    shutil.which('chromedriver')
-                ]
-                
-                chromedriver_path = None
-                for path in chromedriver_paths:
-                    if path and os.path.isfile(path):
-                        chromedriver_path = path
-                        break
-                
-                if chromedriver_path:
-                    print(f"✅ Found ChromeDriver at: {chromedriver_path}")
-                    service = Service(executable_path=chromedriver_path)
-                else:
-                    print("⚠️ Using default ChromeDriver service")
-                    service = Service()
-                    
-                self.driver = webdriver.Chrome(service=service, options=chrome_options)
-                print("✅ ChromeDriver initialized successfully in CI environment")
-                
-            except Exception as e:
-                print(f"❌ Error setting up ChromeDriver in CI: {e}")
-                raise
-        else:
+        try:
             # Local development environment
             try:
                 # Try WebDriver Manager for local development
@@ -88,12 +102,12 @@ class CSEDownloader:
                 # For newer Chrome versions, try different approaches
                 try:
                     print("Trying to get ChromeDriver...")
-                    service = Service(ChromeDriverManager().install())
+                    service = ChromeService(ChromeDriverManager().install())
                 except Exception as wdm_error:
                     print(f"WebDriver Manager failed: {wdm_error}")
                     print("Trying with specific Chrome version compatibility...")
                     # Try with specific driver version that works with newer Chrome
-                    service = Service(ChromeDriverManager(version="129.0.6668.89").install())
+                    service = ChromeService(ChromeDriverManager(version="129.0.6668.89").install())
                     
                 self.driver = webdriver.Chrome(service=service, options=chrome_options)
                 print("✅ ChromeDriver initialized with WebDriver Manager")
@@ -101,12 +115,16 @@ class CSEDownloader:
                 print(f"Local WebDriver setup failed: {local_error}")
                 # Fallback to system ChromeDriver
                 try:
-                    service = Service()
+                    service = ChromeService()
                     self.driver = webdriver.Chrome(service=service, options=chrome_options)
                     print("✅ ChromeDriver initialized with system driver")
                 except Exception as system_error:
                     print(f"❌ All ChromeDriver methods failed: {system_error}")
                     raise
+                    
+        except Exception as e:
+            print(f"❌ Error setting up Chrome locally: {e}")
+            raise
         
     def get_timestamp_from_page(self):
         """Extract timestamp from the updated-time span element"""
