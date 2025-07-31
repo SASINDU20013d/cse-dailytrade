@@ -8,7 +8,6 @@ from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 
 class CSEDownloader:
     def __init__(self, download_path="downloads"):
@@ -40,12 +39,20 @@ class CSEDownloader:
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
         
-        # Uncomment the next line if you want to run headless locally
-        # chrome_options.add_argument("--headless")
-        
-        # Setup driver with automatic ChromeDriver management
-        service = Service(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=service, options=chrome_options)
+        # Setup driver - use system ChromeDriver in GitHub Actions, WebDriver Manager locally
+        try:
+            # Try system ChromeDriver first (for GitHub Actions)
+            service = Service()  # Uses system chromedriver
+            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+        except Exception:
+            # Fallback to WebDriver Manager (for local development)
+            try:
+                from webdriver_manager.chrome import ChromeDriverManager
+                service = Service(ChromeDriverManager().install())
+                self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            except ImportError:
+                print("Please install webdriver-manager: pip install webdriver-manager")
+                raise
         
     def get_timestamp_from_page(self):
         """Extract timestamp from the updated-time span element"""

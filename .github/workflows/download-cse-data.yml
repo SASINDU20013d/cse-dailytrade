@@ -25,6 +25,9 @@ jobs:
       with:
         chrome-version: stable
         
+    - name: Setup ChromeDriver
+      uses: nanasess/setup-chromedriver@v2
+      
     - name: Setup virtual display
       run: |
         sudo apt-get update
@@ -36,6 +39,12 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        
+    - name: Verify Chrome and ChromeDriver
+      run: |
+        google-chrome --version
+        chromedriver --version
+        echo "DISPLAY=$DISPLAY"
         
     - name: Create downloads directory
       run: mkdir -p downloads
