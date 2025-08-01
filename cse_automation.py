@@ -180,11 +180,11 @@ class CSETradeAutomation:
             print(f"Extracted timestamp for filename: {file_timestamp}")
             
             # Clear download directory before downloading
-            for file in glob.glob(os.path.join(self.download_dir, "*")):
-                try:
-                    os.remove(file)
-                except:
-                    pass
+            #for file in glob.glob(os.path.join(self.download_dir, "*")):
+             #   try:
+             #       os.remove(file)
+             #   except:
+             #       pass
             
             # Click the download button
             print("Clicking download button...")
