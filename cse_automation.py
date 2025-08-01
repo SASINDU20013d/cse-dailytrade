@@ -108,17 +108,63 @@ class CSETradeAutomation:
     
     def wait_for_download(self, timeout=60):
         """Wait for download to complete"""
+        # Get list of files before download starts
+        initial_files = set(glob.glob(os.path.join(self.download_dir, "*")))
+        
         end_time = time.time() + timeout
         while time.time() < end_time:
             # Check for completed downloads (files without .crdownload extension)
-            files = glob.glob(os.path.join(self.download_dir, "*"))
-            download_files = [f for f in files if not f.endswith('.crdownload')]
-            if download_files:
-                # Return the most recently created file
-                latest_file = max(download_files, key=os.path.getctime)
+            current_files = set(glob.glob(os.path.join(self.download_dir, "*")))
+            
+            # Look for new files that weren't there before
+            new_files = current_files - initial_files
+            completed_files = [f for f in new_files if not f.endswith('.crdownload') and not f.endswith('.tmp')]
+            
+            if completed_files:
+                # Return the most recently created file among new files
+                latest_file = max(completed_files, key=os.path.getctime)
+                print(f"New download detected: {os.path.basename(latest_file)}")
                 return latest_file
+                
+            # Also check if any .crdownload files have completed
+            all_files = glob.glob(os.path.join(self.download_dir, "*"))
+            download_in_progress = [f for f in all_files if f.endswith('.crdownload')]
+            
+            if not download_in_progress and len(current_files) > len(initial_files):
+                # No downloads in progress and we have more files than before
+                new_files_list = list(new_files)
+                if new_files_list:
+                    latest_file = max(new_files_list, key=os.path.getctime)
+                    return latest_file
+                    
             time.sleep(1)
+            
         raise TimeoutError("Download did not complete within timeout period")
+    
+    def get_unique_filename(self, base_filename, directory):
+        """Generate a unique filename by adding a counter if file exists"""
+        filepath = os.path.join(directory, base_filename)
+        
+        if not os.path.exists(filepath):
+            return filepath
+        
+        # Extract name and extension
+        name, ext = os.path.splitext(base_filename)
+        counter = 1
+        
+        while True:
+            new_filename = f"{name}_{counter:03d}{ext}"
+            new_filepath = os.path.join(directory, new_filename)
+            if not os.path.exists(new_filepath):
+                return new_filepath
+            counter += 1
+            
+            # Safety check to avoid infinite loop
+            if counter > 999:
+                # Use timestamp as final fallback
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                new_filename = f"{name}_{timestamp}{ext}"
+                return os.path.join(directory, new_filename)
     
     def extract_timestamp_from_text(self, text):
         """Extract timestamp from the span text and format it for filename"""
@@ -179,12 +225,7 @@ class CSETradeAutomation:
             file_timestamp = self.extract_timestamp_from_text(timestamp_text)
             print(f"Extracted timestamp for filename: {file_timestamp}")
             
-            # Clear download directory before downloading
-            #for file in glob.glob(os.path.join(self.download_dir, "*")):
-             #   try:
-             #       os.remove(file)
-             #   except:
-             #       pass
+            # Don't clear download directory - keep old files
             
             # Click the download button
             print("Clicking download button...")
@@ -231,14 +272,26 @@ class CSETradeAutomation:
             downloaded_file = self.wait_for_download()
             print(f"Downloaded file: {downloaded_file}")
             
-            # Rename the file with timestamp
+            # Create new filename with timestamp
             new_filename = f"cse_trade_summary_{file_timestamp}.csv"
-            new_filepath = os.path.join(os.path.dirname(downloaded_file), new_filename)
             
-            os.rename(downloaded_file, new_filepath)
-            print(f"File renamed to: {new_filename}")
+            # Get unique filepath to avoid conflicts
+            unique_filepath = self.get_unique_filename(new_filename, os.path.dirname(downloaded_file))
+            unique_filename = os.path.basename(unique_filepath)
             
-            return new_filepath
+            try:
+                os.rename(downloaded_file, unique_filepath)
+                print(f"File renamed to: {unique_filename}")
+                
+                if unique_filename != new_filename:
+                    print(f"Note: File was renamed to avoid conflict with existing file")
+                    
+            except Exception as e:
+                print(f"Warning: Could not rename file: {e}")
+                print(f"File remains as: {os.path.basename(downloaded_file)}")
+                unique_filepath = downloaded_file
+            
+            return unique_filepath
             
         except Exception as e:
             print(f"Error during download: {e}")
@@ -250,15 +303,35 @@ class CSETradeAutomation:
 def main():
     """Main execution function"""
     try:
+        print("=" * 60)
+        print("CSE Trade Summary Automation Starting...")
+        print(f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print("=" * 60)
+        
         automation = CSETradeAutomation()
         downloaded_file = automation.download_trade_summary()
-        print("CSE Trade Summary automation completed successfully!")
-        print(f"Downloaded file: {downloaded_file}")
+        
+        print("=" * 60)
+        print("SUCCESS: CSE Trade Summary automation completed!")
+        print(f"Downloaded file: {os.path.basename(downloaded_file)}")
+        print(f"Full path: {downloaded_file}")
+        print(f"File size: {os.path.getsize(downloaded_file)} bytes")
+        print("=" * 60)
+        
         return downloaded_file
         
     except Exception as e:
-        print(f"Automation failed: {e}")
-        exit(1)
+        print("=" * 60)
+        print("ERROR: Automation failed!")
+        print(f"Error details: {e}")
+        print("=" * 60)
+        print("\nTroubleshooting tips:")
+        print("1. Check your internet connection")
+        print("2. Verify the CSE website is accessible")
+        print("3. Make sure Chrome browser is installed and updated")
+        print("4. Check if downloads folder has write permissions")
+        print("5. Try running the script again after a few minutes")
+        return None
 
 if __name__ == "__main__":
     main()
